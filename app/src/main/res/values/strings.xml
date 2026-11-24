@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">أكاديمية أويلر</string>
+    <string name="nav_math">الرياضيات</string>
+    <string name="nav_physics">الفيزياء</string>
+    <string name="nav_chemistry">الكيمياء</string>
+    <string name="nav_sync">التحديث</string>
+    <string name="press_back_again">اضغط مرة أخرى للخروج</string>
+</resources>

@@ -1,0 +1,102 @@
+name: Build & Release Signed Android APK
+
+on:
+  push:
+    branches: [main]
+  repository_dispatch:
+    types: [lessons-updated]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Android app repo
+        uses: actions/checkout@v4
+
+      - name: Checkout Euler Academy web lessons (assets/www)
+        uses: actions/checkout@v4
+        with:
+          repository: eulerx0/euler-academy
+          path: web_source
+
+      - name: Populate bundled offline assets into app/src/main/assets/www
+        run: |
+          mkdir -p app/src/main/assets/www
+          for item in index.html icon.svg manifest.webmanifest manifest.json css data js modules simulators vendor; do
+            if [ -e "web_source/$item" ]; then
+              cp -r "web_source/$item" "app/src/main/assets/www/"
+            fi
+          done
+          ls -la app/src/main/assets/www
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle 8.7
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Decode Release Keystore & Compute Version
+        id: meta
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/release.jks
+          VER_CODE=$((100 + GITHUB_RUN_NUMBER))
+          VER_NAME="1.0.${GITHUB_RUN_NUMBER}"
+          echo "version_code=${VER_CODE}" >> "$GITHUB_OUTPUT"
+          echo "version_name=${VER_NAME}" >> "$GITHUB_OUTPUT"
+          node -e "
+            const fs = require('fs');
+            const m = JSON.parse(fs.readFileSync('app/src/main/assets/www/manifest.json', 'utf8'));
+            console.log('Bundled manifest:', m.bundleHash, m.stats);
+            fs.writeFileSync('version.json', JSON.stringify({
+              versionCode: ${VER_CODE},
+              versionName: '${VER_NAME}',
+              bundleHash: m.bundleHash,
+              stats: m.stats,
+              apkUrl: 'https://github.com/eulerx0/euler-academy-android/releases/latest/download/Euler-Academy.apk'
+            }, null, 2));
+          "
+
+      - name: Build Signed Release APK
+        env:
+          APK_VERSION_CODE: ${{ steps.meta.outputs.version_code }}
+          APK_VERSION_NAME: ${{ steps.meta.outputs.version_name }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: gradle assembleRelease --no-daemon
+
+      - name: Prepare Release Artifacts
+        run: |
+          mkdir -p release_out
+          cp app/build/outputs/apk/release/app-release.apk release_out/Euler-Academy.apk
+          cp version.json release_out/version.json
+          ls -lh release_out/
+          rm -f app/release.jks
+
+      - name: Publish Release on GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.meta.outputs.version_name }}
+          name: "📱 Euler Academy Android v${{ steps.meta.outputs.version_name }}"
+          body: |
+            ### 🎓 تطبيق أكاديمية أويلر لأندرويد — Euler Academy (2BAC PC Maroc)
+
+            تطبيق أندرويد مخصص للهاتف **يعمل 100% بدون إنترنت** ويحتوي على جميع الدروس، المختبرات البصرية `60fps`، المعجم الثنائي، والفروض المحروسة `20/20`، مع **تحديث تلقائي للدروس (OTA)** فور إضافة أي درس جديد.
+
+            - 📥 **التثبيت:** حمّل ملف **`Euler-Academy.apk`** وافتحه على هاتف Android (الإصدار 7.0 فما فوق).
+            - 🔄 **التحديث التلقائي:** يزامن الدروس الجديدة تلقائياً عند توفر الإنترنت دون الحاجة لإعادة تثبيت التطبيق.
+          draft: false
+          prerelease: false
+          make_latest: true
+          files: |
+            release_out/Euler-Academy.apk
+            release_out/version.json

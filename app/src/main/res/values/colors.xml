@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg_primary">#060911</color>
+    <color name="bg_surface">#0B1120</color>
+    <color name="border_slate">#1E293B</color>
+    <color name="cyan_accent">#22D3EE</color>
+    <color name="cyan_tint">#1F22D3EE</color>
+    <color name="blue_accent">#2563EB</color>
+    <color name="emerald_accent">#10B981</color>
+    <color name="text_primary">#F1F5F9</color>
+    <color name="text_muted">#94A3B8</color>
+</resources>
